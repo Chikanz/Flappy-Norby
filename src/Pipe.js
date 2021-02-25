@@ -1,7 +1,5 @@
 //Class for a single half of a 'pipe'
 
-const playerXpos = 100;
-
 export default class Pipe extends Phaser.Physics.Arcade.Sprite {
 
     static preload(scene) {

@@ -4,7 +4,7 @@
 
 import Pipe from "./Pipe";
 
-const spawnInterval = 3; //time distance between spawning pipes in seconds
+const spawnInterval = 2500; //time distance between spawning pipes in ms
 const pipeGap = 150; //gap between top and bottom pipe in pixels //125
 
 const playerXpos = 100; //todo pass through constructor
@@ -29,22 +29,12 @@ export default class PipeManager {
             pipeWidth = p.width; //get rough pipe width for spawning
         }
 
-        spawnPoint = scene.cameras.main.width / 2 + pipeWidth;
+        spawnPoint = scene.cameras.main.width + pipeWidth + 20;
         screenHeight = scene.cameras.main.height;
 
         this.lastDT = 0;
         this.scene = scene;
-        this.spawnPipes = true;
-
-        this.timer = scene.time.addEvent({
-            delay: spawnInterval * 1000,
-            startAt: 0,
-            callback: () => {
-                if (this.spawnPipes) //only spawn if player is alive
-                    this.CreatePipes('pipe_top', 'pipe_bottom', pipeSpeed);
-            },
-            loop: true
-        });
+        this.spawnPipes = false;
 
         //Score zones
         this.scoreZones = scene.physics.add.group({
@@ -60,10 +50,34 @@ export default class PipeManager {
             child.body.setSize(5, pipeGap);
         })
 
-        //start right away
-        this.CreatePipes('pipe_top', 'pipe_bottom', pipeSpeed);
-
         this.pipeSpeed = pipeSpeed;
+    }
+
+    Start() {
+        this.CreatePipes('pipe_top', 'pipe_bottom', this.pipeSpeed); //pre spawn a pipe since the next one starts after the timer 
+        this.timer = this.scene.time.addEvent({
+            delay: spawnInterval,
+            startAt: 0,
+            callback: () => {
+                this.CreatePipes('pipe_top', 'pipe_bottom', this.pipeSpeed);
+            },
+            loop: true
+        });
+    }
+
+    Stop() {
+        this.timer.remove();
+    }
+
+    //Move all pipes + score zones offscreen
+    Reset() {
+        for (var i = 0; i < this.poolSize; i++) {
+            this.pipes[i].y = -9999;
+        }
+
+        this.scoreZones.children.iterate((child) => {
+            child.y = -999;
+        })
     }
 
     CreatePipes(topPipeTexture, bottomPipeTexture, speed) {
@@ -92,9 +106,8 @@ export default class PipeManager {
         newPipe.setTexture(texture);
         newPipe.body.setSize(newPipe.width, newPipe.height, true); //resize the collider 
 
-        //add score zone
+        //add score zone (invisible collider)
         if (isBottom) { //only do for one pipe
-            console.log(this.scoreZones.children.entries);
             const zone = this.scoreZones.children.entries[this.poolIndex % (this.poolSize / 2)];
 
             zone.x = spawnPoint;

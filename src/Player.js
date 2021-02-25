@@ -8,11 +8,18 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     //Preload assets statically since assets don't belong to any single object instance
     static preload(scene) {
+
+        //Sprites
         scene.load.image('norby', 'assets/sprites/norby.png');
-        scene.load.image('norby_ded', 'assets/sprites/deadnorby.png');
+        scene.load.image('norby_dead', 'assets/sprites/deadnorby.png');
+
+        //Audio
+        scene.load.audio('flap', 'assets/audio/wing.wav');
+        scene.load.audio('hit', 'assets/audio/hit.wav');
+        scene.load.audio('point', 'assets/audio/point.wav');
     }
 
-    constructor(scene, x, y, texture, jumpKey) {
+    constructor(scene, x, y, texture, deadTexture, jumpKey) {
         //Create the object by filling sprite constructor + register update
         super(scene, x, y, texture);
         scene.add.existing(this);
@@ -32,9 +39,12 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         this.startedJumpRestore = false;
 
         //pass through settings
-        this.body.setGravityY(gravity);
         this.flapForce = flapForce;
         this.jumpKey = scene.input.keyboard.addKey(jumpKey);
+
+        this.textureName = texture;
+        this.deadTexture = deadTexture;
+        this.startPosition = { x, y };
     }
 
     //helper function to register collision with other stuff in the scene
@@ -48,23 +58,31 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         this.alive = false;
         this.body.setDrag(80);
-        this.setTexture('norby_ded');
+        this.setTexture(this.deadTexture);
         this.startGameOver();
         this.setVelocityX(this.flapForce / 2); //roll along the ground a bit after death
-    }
-
-    //callback to let scene know when we're dead
-    registerGameOverCallback(callback) {
-        this.startGameOver = callback;
+        this.scene.sound.play('hit');
     }
 
     update() {
 
+        if (!this.alive) return;
+
         //Jump mechanics
-        if (this.jumpKey.isDown && this.canJump && this.alive) {
+        if (this.jumpKey.isDown && this.canJump) {
             this.setVelocityY(-this.flapForce);
             this.angle = -20
             this.canJump = false;
+            this.scene.sound.play('flap');
+
+            //Break out of start state
+            if (this.waiting) {
+                this.waiting = false;
+                this.tween.remove();
+                this.body.allowGravity = true;
+                this.body.setGravityY(gravity);
+                this.startGame();
+            }
         }
 
         //Reset jump only when jump key is up
@@ -78,6 +96,47 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         //this used to be in place to mimmic flappy bird behaviour, but looks way funnier without it 
         //if (this.angle < 90) 
-        if (this.alive) this.angle += 2;
+        if (this.alive && !this.waiting) this.angle += 2;
+    }
+
+    //For when the game is waiting to be started
+    StartScreenBob() {
+        this.body.allowGravity = false;
+        this.tween = this.scene.tweens.add({
+            targets: this,
+            y: this.y + 20,
+            duration: 1500,
+            ease: 'Sine.inOut',
+            yoyo: true,
+            repeat: -1
+        });
+
+        this.waiting = true;
+    }
+
+    Reset() {
+        this.x = this.startPosition.x;
+        this.y = this.startPosition.y;
+        this.setVelocity(0, 0);
+        this.body.setGravityY(0);
+
+        this.angle = 0;
+        this.canJump = true;
+        this.startedJumpRestore = false;
+
+        this.alive = true;
+
+        this.setTexture(this.textureName)
+    }
+
+
+    //callback to let scene know when we're dead
+    OnGameOver(callback) {
+        this.startGameOver = callback;
+    }
+
+    //CallBack to let scene know when we've started the game
+    OnGameStart(callback) {
+        this.startGame = callback;
     }
 }
