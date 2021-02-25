@@ -34,7 +34,6 @@ export default class PipeManager {
 
         this.lastDT = 0;
         this.scene = scene;
-        this.spawnPipes = false;
 
         //Score zones
         this.scoreZones = scene.physics.add.group({

@@ -5,6 +5,7 @@ import ScrollObject from '../ScrollObject';
 import Pipe from '../Pipe';
 import PipeManager from '../PipeManager';
 import ScoreRenderer from '../ScoreRenderer';
+import UI from '../UI';
 
 let state = new State();
 
@@ -19,11 +20,9 @@ let ground;
 let player;
 let pipeMan;
 let scoreText;
-let title;
-let titleTween;
-let tutorial;
-let gameOver;
-let gameOverTween;
+let ui;
+
+let updateOnMove = []; //list of objects that need .update called on move
 
 export default class MainScene extends Phaser.Scene {
   constructor() {
@@ -35,51 +34,39 @@ export default class MainScene extends Phaser.Scene {
     Player.preload(this);
     ScrollObject.preload(this);
     ScoreRenderer.preload(this);
-
-    //Starting UI
-    this.load.image('title', 'assets/sprites/titleCard.png');
-    this.load.image('tutorial', 'assets/sprites/tutorial.png');
-    this.load.image('game_over', 'assets/sprites/gameover.png');
+    UI.preload(this);
   }
 
   create() {
     //background texture scroll
     bg = new ScrollObject(this, 0, 690, 800, 600, 'bg', BGscrollSpeed).setOrigin(0, 1);
+    updateOnMove.push(bg);
 
     //Setup Player
     player = new Player(this, playerXpos, this.cameras.main.height / 4, 'norby', 'norby_dead', Phaser.Input.Keyboard.KeyCodes.UP);
-
     player.StartScreenBob();
     player.OnGameStart(() => this.StartGame());
     player.OnGameOver(() => this.EndGame()); //has to be an anon method so that the 'this' keyword refers to the scene
 
     //Setup Pipes + collisions against player
     pipeMan = new PipeManager(this, 10, foregroundScrollSpeed);
-    for (var i = 0; i < pipeMan.pipes.length; i++) {
-      player.collideAgainst(pipeMan.pipes[i]);
-    }
+    pipeMan.pipes.map((pipe) => player.collideAgainst(pipe));
     this.physics.add.overlap(player, pipeMan.scoreZones, this.AddScore, null, this); //scoring
+    updateOnMove.push(pipeMan);
 
     //Ground
     ground = new ScrollObject(this, 0, 650, 800, 100, 'ground', foregroundScrollSpeed).setOrigin(0, 1);
     this.physics.add.existing(ground, true); //enable physics on ground
     player.collideAgainst(ground);
+    updateOnMove.push(ground);
 
     //Score text
     scoreText = new ScoreRenderer(this, 4);
 
-    //Title card + tutorial
-    title = this.add.image(400, this.cameras.main.height / 4, 'title');
-    title.setScale(2);
-    titleTween = this.tweens.add({
-      targets: title,
-      y: this.cameras.main.height / 4 + 20,
-      ...subtlebob
-    });
+    ui = new UI(this);
 
-    tutorial = this.add.image(400, this.cameras.main.height - 250, 'tutorial');
-    gameOver = this.add.image(this.cameras.main.width / 2, this.cameras.main.height + 100, 'game_over');
-
+    //Register any key press for triggering reset after game over 
+    //(not really ideal since it fires on every key press)
     this.input.keyboard.on('keyup', (event) => {
       if (state.current.gameOver) {
         this.Reset();
@@ -87,16 +74,11 @@ export default class MainScene extends Phaser.Scene {
     })
   }
 
+  //Update updatables like scrolling items and the pipe manager
+  //(most objects call their own update through a scene event)
   update() {
-    //Only spawn pipes when the level is moving
-    pipeMan.spawnPipes = state.current.moving;
-
-    //Move BG 
-    //(ideally if there were heaps of these they'd be in a list that gets iterated for .update())
     if (state.current.moving) {
-      bg.update();
-      ground.update();
-      pipeMan.update();
+      updateOnMove.map((object) => object.update());
     }
   }
 
@@ -112,11 +94,8 @@ export default class MainScene extends Phaser.Scene {
   StartGame() {
     state.current.moving = true;
     pipeMan.Start();
-
     scoreText.DrawScore(0, this.cameras.main.width / 2, 50);
-
-    this.tweens.add({ targets: title, ...fadeOut });
-    this.tweens.add({ targets: tutorial, ...fadeOut });
+    ui.RemoveTitleSprites();
   }
 
   //Triggered by player ending the game
@@ -124,8 +103,7 @@ export default class MainScene extends Phaser.Scene {
     state.current.gameOver = true;
     state.current.moving = false;
     pipeMan.Stop();
-
-    gameOverTween = this.tweens.add({ targets: gameOver, ...fadeInMove });
+    ui.ShowGameOver();
 
     //Set highscore
     const best = localStorage.getItem('best');
@@ -136,16 +114,11 @@ export default class MainScene extends Phaser.Scene {
   //called when any key is pressed after game over
   //there's probably some phaser way of doing this but I bet this is way faster
   Reset() {
-    title.alpha = 1;
-    tutorial.alpha = 1;
+    ui.Reset();
 
-    gameOverTween.remove();
-    gameOver.y = this.cameras.main.height + 100
     pipeMan.Reset();
     state.Reset();
     scoreText.SetScore(0);
-
-
 
     player.Reset();
     player.StartScreenBob();
@@ -154,25 +127,4 @@ export default class MainScene extends Phaser.Scene {
     bg.tilePositionX = 0;
     ground.tilePositionX = 0;
   }
-}
-
-//tweens
-const subtlebob = {
-  duration: 1500,
-  ease: 'Sine.inOut',
-  yoyo: true,
-  repeat: -1
-}
-
-const fadeOut = {
-  alpha: 0,
-  duration: 300,
-  ease: 'Power2'
-}
-
-const fadeInMove = {
-  y: 300,
-  alpha: { from: 0, to: 1 },
-  duration: 2000,
-  ease: 'Bounce'
 }

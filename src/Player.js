@@ -65,8 +65,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     update() {
-
-        if (!this.alive) return;
+        if (!this.alive) return; //no need to update when dead
 
         //Jump mechanics
         if (this.jumpKey.isDown && this.canJump) {
@@ -94,9 +93,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
             this.startedJumpRestore = true;
         }
 
-        //this used to be in place to mimmic flappy bird behaviour, but looks way funnier without it 
+        //this line below used to be in place to mimmic flappy bird behaviour, but looks way funnier without it lol
         //if (this.angle < 90) 
-        if (this.alive && !this.waiting) this.angle += 2;
+        if (!this.waiting) this.angle += 2;
     }
 
     //For when the game is waiting to be started
