@@ -56,10 +56,12 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     die() {
         if (!this.alive) return;
 
+        this.setCollideWorldBounds(false);
+
         this.alive = false;
         this.body.setDrag(80);
         this.setTexture(this.deadTexture);
-        this.startGameOver();
+        if (this.startGameOver) this.startGameOver();
         this.setVelocityX(this.flapForce / 2); //roll along the ground a bit after death
         this.scene.sound.play('hit');
     }
@@ -67,7 +69,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     update() {
         if (!this.alive) return; //no need to update when dead
 
-        //Jump mechanics
+        //Jump mechanics 
         if (this.jumpKey.isDown && this.canJump) {
             this.setVelocityY(-this.flapForce);
             this.angle = -20
@@ -76,11 +78,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
             //Break out of start state
             if (this.waiting) {
-                this.waiting = false;
-                this.tween.remove();
-                this.body.allowGravity = true;
-                this.body.setGravityY(gravity);
-                this.startGame();
+                this.stopWaiting();
             }
         }
 
@@ -96,6 +94,14 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         //this line below used to be in place to mimmic flappy bird behaviour, but looks way funnier without it lol
         //if (this.angle < 90) 
         if (!this.waiting) this.angle += 2;
+    }
+
+    stopWaiting(usecallback = true) {
+        this.waiting = false;
+        this.tween.remove();
+        this.body.allowGravity = true;
+        this.body.setGravityY(gravity);
+        if (usecallback) this.startGame();
     }
 
     //For when the game is waiting to be started
@@ -124,6 +130,8 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         this.startedJumpRestore = false;
 
         this.alive = true;
+
+        this.setCollideWorldBounds(true);
 
         this.setTexture(this.textureName)
     }

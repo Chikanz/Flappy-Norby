@@ -17,12 +17,14 @@ const playerXpos = 100;
 //Objects
 let bg;
 let ground;
-let player;
+//let player;
 let pipeMan;
 let scoreText;
 let ui;
 
 let updateOnMove = []; //list of objects that need .update called on move
+
+let players = [];
 
 export default class MainScene extends Phaser.Scene {
   constructor() {
@@ -38,26 +40,40 @@ export default class MainScene extends Phaser.Scene {
   }
 
   create() {
+
     //background texture scroll
     bg = new ScrollObject(this, 0, 690, 800, 600, 'bg', BGscrollSpeed).setOrigin(0, 1);
     updateOnMove.push(bg);
 
-    //Setup Player
-    player = new Player(this, playerXpos, this.cameras.main.height / 4, 'norby', 'norby_dead', Phaser.Input.Keyboard.KeyCodes.UP);
-    player.StartScreenBob();
-    player.OnGameStart(() => this.StartGame());
-    player.OnGameOver(() => this.EndGame()); //has to be an anon method so that the 'this' keyword refers to the scene
+    //Setup Players here
+    players = [
+      new Player(this, playerXpos, this.cameras.main.height / 4, 'norby', 'norby_dead', Phaser.Input.Keyboard.KeyCodes.UP),
+      new Player(this, playerXpos, this.cameras.main.height / 4, 'norby', 'norby_dead', Phaser.Input.Keyboard.KeyCodes.W),
+    ];
+
+    //offset players slightly
+    players.map((player, i) => {
+      player.x += i * 10;
+      player.StartScreenBob();
+      player.OnGameStart(() => this.StartGame());
+    });
+
+    //player.OnGameOver(() => this.EndGame()); //has to be an anon method so that the 'this' keyword refers to the scene
 
     //Setup Pipes + collisions against player
     pipeMan = new PipeManager(this, 10, foregroundScrollSpeed);
-    pipeMan.pipes.map((pipe) => player.collideAgainst(pipe));
-    this.physics.add.overlap(player, pipeMan.scoreZones, this.AddScore, null, this); //scoring
     updateOnMove.push(pipeMan);
+
+    //setup pipes for all players
+    players.map((player) => {
+      pipeMan.pipes.map((pipe) => player.collideAgainst(pipe));
+      this.physics.add.overlap(player, pipeMan.scoreZones, this.AddScore, null, this); //scoring
+    });
 
     //Ground
     ground = new ScrollObject(this, 0, 650, 800, 100, 'ground', foregroundScrollSpeed).setOrigin(0, 1);
     this.physics.add.existing(ground, true); //enable physics on ground
-    player.collideAgainst(ground);
+    players.map((player) => player.collideAgainst(ground));
     updateOnMove.push(ground);
 
     //Score text
@@ -80,6 +96,8 @@ export default class MainScene extends Phaser.Scene {
     if (state.current.moving) {
       updateOnMove.map((object) => object.update());
     }
+
+    this.CheckPlayersDead();
   }
 
   //Called when player overlaps with score zone
@@ -92,14 +110,21 @@ export default class MainScene extends Phaser.Scene {
   }
 
   StartGame() {
+    if (state.current.moving) return;
+
+    console.log('started');
+
     state.current.moving = true;
     pipeMan.Start();
     scoreText.DrawScore(0, this.cameras.main.width / 2, 50);
     ui.RemoveTitleSprites();
+
+    players.map((player) => player.stopWaiting(false)); //this will cause a recursive callback
   }
 
   //Triggered by player ending the game
   EndGame() {
+    console.log('game over!');
     state.current.gameOver = true;
     state.current.moving = false;
     pipeMan.Stop();
@@ -111,6 +136,19 @@ export default class MainScene extends Phaser.Scene {
       localStorage.setItem('best', state.current.score);
   }
 
+  CheckPlayersDead() {
+    if (!state.current.gameOver) {
+
+      let allPlayersDead = true;
+      players.map((player) => {
+        if (player.alive) allPlayersDead = false;
+        else player.x += foregroundScrollSpeed; //move dead player off screen
+      });
+
+      if (allPlayersDead) this.EndGame();
+    }
+  }
+
   //called when any key is pressed after game over
   //there's probably some phaser way of doing this but I bet this is way faster
   Reset() {
@@ -120,8 +158,10 @@ export default class MainScene extends Phaser.Scene {
     state.Reset();
     scoreText.SetScore(0);
 
-    player.Reset();
-    player.StartScreenBob();
+    players.map((player) => {
+      player.Reset();
+      player.StartScreenBob();
+    })
 
     //reset tiled bg
     bg.tilePositionX = 0;
