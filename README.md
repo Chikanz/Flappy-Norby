@@ -2,7 +2,7 @@
 
 A simple flappy bird clone using the Phaser 3 framework
 
-Local multiplayer with support for N players is availible on the multiplayer branch
+Local multiplayer with support for N players is available on the multiplayer branch
 
 ## Available Commands
 
